@@ -25,7 +25,7 @@
 	<num_buttons>4</num_buttons>
 	<buttons names="Punch,Block,Start,Coin" default="Y,B,X,Z"></buttons>
 
-	<switches default="d1,ef">
+	<switches default="5a,08">
 
         <dip bits="0,1" name="Replay" ids="None,70000,100000,150000"/>
         <dip bits="2" name="Attract Mode" ids="Sound,No Sound"/>

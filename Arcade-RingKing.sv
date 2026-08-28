@@ -148,10 +148,10 @@ wire [7:0] p3 = {
     2'b00,
     ~core_vb,
     1'b1,
-    ~joystick_1[7],
-    ~joystick_0[7],
+    ~joystick_1[6],
+    ~joystick_0[6],
     1'b1,
-    ~joystick_0[6]
+    ~joystick_0[7]
 };
 
 wire [7:0] dsw  = ~sw[0];

@@ -896,9 +896,9 @@ module core (
             vcnt      <= 9'd0;
             vblank_i  <= 1'b1;
         end else if (ce_pix_clk) begin
-            if (hcnt == 9'd319) begin
+            if (hcnt == 9'd383) begin
                 hcnt <= 9'd0;
-                if (vcnt == 9'd311) begin
+                if (vcnt == 9'd261) begin
                     vcnt     <= 9'd0;
                     vblank_i <= 1'b0;
                 end else begin
