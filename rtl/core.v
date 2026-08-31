@@ -86,12 +86,25 @@ module core (
     assign sndrom_hi_addr  = snd_addr[13:0];
     assign srom_addr       = spr_addr[12:0];
 
-    wire ce_pix_clk;
     wire ce_cpu;
     wire ce_4m_vid;
     wire ce_4m_snd;
 
-    clk_en #(.DIV(7))  u_ce_pix    (.ref_clk(clk_sys), .cen(ce_pix_clk));
+    // 5 MHz pixel clock from 48 MHz: 5 pulses per 48 cycles (pattern 10,10,10,9,9)
+    reg [5:0] pix_clk_cnt = 0;
+    reg       ce_pix_clk = 0;
+    always @(posedge clk_sys) begin
+        ce_pix_clk <= 1'b0;
+        if (pix_clk_cnt == 6'd47)
+            pix_clk_cnt <= 0;
+        else
+            pix_clk_cnt <= pix_clk_cnt + 6'd1;
+        case (pix_clk_cnt)
+            6'd0, 6'd10, 6'd19, 6'd29, 6'd38: ce_pix_clk <= 1'b1;
+            default: ;
+        endcase
+    end
+
     clk_en #(.DIV(7))  u_ce_cpu    (.ref_clk(clk_sys), .cen(ce_cpu));
     clk_en #(.DIV(11)) u_ce_4m_vid (.ref_clk(clk_sys), .cen(ce_4m_vid));
     clk_en #(.DIV(11)) u_ce_4m_snd (.ref_clk(clk_sys), .cen(ce_4m_snd));
@@ -896,7 +909,7 @@ module core (
             vcnt      <= 9'd0;
             vblank_i  <= 1'b1;
         end else if (ce_pix_clk) begin
-            if (hcnt == 9'd383) begin
+            if (hcnt == 9'd319) begin
                 hcnt <= 9'd0;
                 if (vcnt == 9'd261) begin
                     vcnt     <= 9'd0;
@@ -947,8 +960,8 @@ module core (
     end
 
     assign vb  = (vcnt < 9'd16 || vcnt >= 9'd240);
-    assign hb  = (hcnt < 9'd16 || hcnt >= 9'd272);
-    assign vs  = (vcnt == 9'd259 || vcnt == 9'd261);
+    assign hb  = (hcnt >= 9'd272);
+    assign vs  = (vcnt == 9'd250 || vcnt == 9'd252);
     assign hs  = (hcnt >= 9'd290 && hcnt <= 9'd310);
 
     // RENDERING

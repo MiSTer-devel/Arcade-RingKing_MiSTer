@@ -8,7 +8,7 @@
 	<platform></platform>
 	<series></series>
 	<year>1985</year>
-	<manufacturer>Wood Place (Data East USA license)</manufacturer>
+	<manufacturer>Data East</manufacturer>
 	<category>Sports</category>
 
 	<setname>ringking</setname>
@@ -16,14 +16,14 @@
 	<rbf>ringking</rbf>
 
 	<resolution>15kHz</resolution>
-	<rotation>horizontal</rotation>
+	<rotation></rotation>
 	<flip></flip>
 
 	<players>2</players>
 	<joystick>8-way</joystick>
 	<special_controls></special_controls>
-	<num_buttons>4</num_buttons>
-	<buttons names="Punch,Block,Start,Coin" default="Y,B,X,Z"></buttons>
+	<num_buttons>5</num_buttons>
+	<buttons names="Punch,Jab,Block,Start,Coin" default="A,B,X,Start,Z"></buttons>
 
 	<switches default="5a,08">
 
