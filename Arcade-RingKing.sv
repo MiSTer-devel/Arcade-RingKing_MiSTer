@@ -125,35 +125,41 @@ always @(posedge clk_sys)
 	if (ioctl_wr && (ioctl_index == 254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
 
 wire [7:0] p1 = ~{
-    1'b0,
-    joystick_0[6],
-    joystick_0[5],
-    joystick_0[4],
-    joystick_0[1],
-    joystick_0[0],
-    joystick_0[2],
-    joystick_0[3]
+    2'b00,
+    joystick_0[5], // p1st2
+    joystick_0[4], // p1st1
+    joystick_0[1], // left
+    joystick_0[0], // right
+    joystick_0[2], // down
+    joystick_0[3]  // up
 };
 
 wire [7:0] p2 = ~{
-    1'b0,
-    joystick_1[6],
-    joystick_1[5],
-    joystick_1[4],
-    joystick_1[1],
-    joystick_1[0],
-    joystick_1[2],
-    joystick_1[3]
+    2'b00,
+    joystick_1[5], // p2st2
+    joystick_1[4], // p2st1
+    joystick_1[1], // left
+    joystick_1[0], // right
+    joystick_1[2], // down
+    joystick_1[3]  // up
 };
 
 wire [7:0] p3 = {
     2'b00,
-    ~core_vb,
-    1'b1,
-    ~joystick_1[7],
-    ~joystick_0[7],
-    1'b1,
-    ~joystick_0[8]
+    ~core_vb,       // VBLK
+    1'b1,           // SNDBSY
+    ~joystick_1[7], // p2 ?
+    ~joystick_0[7], // p1 ?
+    1'b1,           // service
+    ~joystick_0[8]  // coin1
+};
+
+wire [7:0] p4 = {
+    4'b0000,
+    ~joystick_1[8], // coin2
+    1'b1,           // NC
+    ~joystick_1[6], // p2st3
+    ~joystick_0[6]  // p1st3
 };
 
 wire [7:0] dsw  = ~sw[0];
@@ -175,6 +181,7 @@ core u_core(
 	.p1              ( p1               ),
 	.p2              ( p2               ),
 	.p3              ( p3               ),
+	.p4              ( p4               ),
 	.dsw             ( dsw              ),
 	.dsw2            ( dsw2             ),
 	.ioctl_download  ( ioctl_download   ),
@@ -234,7 +241,7 @@ screen_rotate screen_rotate
 
 assign AUDIO_L = core_sound;
 assign AUDIO_R = core_sound;
-assign AUDIO_S = 1; // signed audio
+assign AUDIO_S = 0; // unsigned audio
 assign AUDIO_MIX = 3; // 100% mono
 
 //////////////////////   LED    /////////////////////////////////
