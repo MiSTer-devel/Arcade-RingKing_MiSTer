@@ -5,6 +5,7 @@ module core (
     input  [7:0]  p1,
     input  [7:0]  p2,
     input  [7:0]  p3,
+    input  [7:0]  p4,
     input  [7:0]  dsw,
     input  [7:0]  dsw2,
     input         ioctl_download,
@@ -88,7 +89,8 @@ module core (
 
     wire ce_cpu;
     wire ce_4m_vid;
-    wire ce_4m_snd;
+    wire ce_m1h_snd;
+    wire ce_ym_snd;
 
     // 5 MHz pixel clock from 48 MHz: 5 pulses per 48 cycles (pattern 10,10,10,9,9)
     reg [5:0] pix_clk_cnt = 0;
@@ -107,7 +109,8 @@ module core (
 
     clk_en #(.DIV(7))  u_ce_cpu    (.ref_clk(clk_sys), .cen(ce_cpu));
     clk_en #(.DIV(11)) u_ce_4m_vid (.ref_clk(clk_sys), .cen(ce_4m_vid));
-    clk_en #(.DIV(11)) u_ce_4m_snd (.ref_clk(clk_sys), .cen(ce_4m_snd));
+    clk_en #(.DIV(11)) u_ce_m1h_snd (.ref_clk(clk_sys), .cen(ce_m1h_snd));
+    clk_en #(.DIV(23)) u_ce_ym_snd (.ref_clk(clk_sys), .cen(ce_ym_snd));
 
     // ROMs
 
@@ -341,13 +344,14 @@ module core (
     wire main_vid_dpram_cs = main_y5_cs && ~main_addr[11];
     wire main_ctrl_cs      = main_y5_cs &&  main_addr[11];
 
-    // I/O — RPORT selector: $E000=DSW1, $E001=DSW2, $E002=P1, $E003=P2, $E004=SYSTEM
+    // I/O — RPORT selector: $E000=DSW1, $E001=DSW2, $E002=P1, $E003=P2, $E004=SYSTEM, $E005=P4
     wire main_io_cs = main_y6_cs && ~main_addr[11];
     wire main_dsw1_cs = main_io_cs && main_addr[3:0] == 4'h0;
     wire main_dsw2_cs = main_io_cs && main_addr[3:0] == 4'h1;
     wire main_p1_cs   = main_io_cs && main_addr[3:0] == 4'h2;
     wire main_p2_cs   = main_io_cs && main_addr[3:0] == 4'h3;
     wire main_sys_cs  = main_io_cs && main_addr[3:0] == 4'h4;
+    wire main_p4_cs   = main_io_cs && main_addr[3:0] == 4'h5;
 
     // Scroll Y
     wire main_scroll_cs = main_y6_cs && main_addr[11];
@@ -492,7 +496,7 @@ module core (
     tv80s #(.Mode(0), .T2Write(1), .IOWait(1)) u_snd_cpu (
         .reset_n  ( ~reset        ),
         .clk      ( clk_sys       ),
-        .cen      ( ce_4m_snd     ),
+        .cen      ( ce_m1h_snd    ),
         .wait_n   ( 1'b1          ),
         .int_n    ( snd_irq_n     ),
         .nmi_n    ( snd_nmi_n     ),
@@ -549,6 +553,7 @@ module core (
         main_p1_cs         ? p1             :
         main_p2_cs         ? p2             :
         main_sys_cs        ? p3             :
+        main_p4_cs         ? p4             :
                               8'hFF;
 
     // vid data bus mux
@@ -587,45 +592,59 @@ module core (
     // SND
 
     wire [7:0] ay_data_r;
-    wire       ay_bdir = ~snd_wr_n && (snd_ay_data_cs || snd_ay_addr_cs);
-    wire       ay_bc   = snd_ay_read_cs || (~snd_wr_n && snd_ay_addr_cs);
+    wire       ay_bdir_w = ~snd_wr_n && (snd_ay_data_cs || snd_ay_addr_cs);
+    wire       ay_bc_w   = snd_ay_read_cs || (~snd_wr_n && snd_ay_addr_cs);
 
+    // Address latch (when BDIR=1, BC=1)
     reg [3:0] ay_addr_latch;
     always @(posedge clk_sys) begin
         if (reset)
             ay_addr_latch <= 4'd0;
-        else if (ay_bdir && ay_bc)
+        else if (ay_bdir_w && ay_bc_w)
             ay_addr_latch <= snd_data_out[3:0];
     end
-
-    wire       ay_cs_n = ~( (ay_bdir && ~ay_bc) || (~ay_bdir && ay_bc) );
-    wire       ay_wr_n = ~(ay_bdir && ~ay_bc);
 
     wire [9:0] ay_sound;
     wire [7:0] ay_a, ay_b, ay_c;
     wire       ay_sample;
 
+    wire       ay_cs_n_w = !( (ay_bdir_w && !ay_bc_w) || (!ay_bdir_w && ay_bc_w) );
+    wire       ay_wr_n_w = !(ay_bdir_w && !ay_bc_w);
+
+    // Synchronize cs_n/wr_n to ce_m1h_snd domain
+    reg ay_cs_n_r = 1'b1;
+    reg ay_wr_n_r = 1'b1;
+    always @(posedge clk_sys) begin
+        if (reset) begin
+            ay_cs_n_r <= 1'b1;
+            ay_wr_n_r <= 1'b1;
+        end else if (ce_m1h_snd) begin
+            ay_cs_n_r <= ay_cs_n_w;
+            ay_wr_n_r <= ay_wr_n_w;
+        end
+    end
+
     jt49 u_ym2149 (
-        .rst_n   ( ~reset        ),
-        .clk     ( clk_sys       ),
-        .clk_en  ( ce_4m_snd     ),
-        .addr    ( ay_addr_latch ),
-        .cs_n    ( ay_cs_n       ),
-        .wr_n    ( ay_wr_n       ),
-        .din     ( snd_data_out  ),
-        .dout    ( ay_data_r     ),
-        .sel     ( 1'b1          ),
-        .sound   ( ay_sound      ),
-        .A       ( ay_a          ),
-        .B       ( ay_b          ),
-        .C       ( ay_c          ),
-        .sample  ( ay_sample     ),
-        .IOA_in  ( sound_cmd_latch ),
-        .IOA_out (               ),
-        .IOA_oe  (               ),
-        .IOB_in  ( 8'hFF         ),
-        .IOB_out (               ),
-        .IOB_oe  (               )
+        .rst_n  ( ~reset         ),
+        .clk    ( clk_sys        ),
+        .clk_en ( ce_ym_snd       ),
+        .addr   ( ay_addr_latch  ),
+        .cs_n   ( ay_cs_n_r      ),
+        .wr_n   ( ay_wr_n_r      ),
+        .din    ( snd_data_out   ),
+        .dout   ( ay_data_r      ),
+        .sel    ( 1'b1           ),
+        .sound  ( ay_sound       ),
+        .A      ( ay_a           ),
+        .B      ( ay_b           ),
+        .C      ( ay_c           ),
+        .sample ( ay_sample      ),
+        .IOA_in ( sound_cmd_latch),
+        .IOA_out(                ),
+        .IOA_oe (                ),
+        .IOB_in ( 8'hFF          ),
+        .IOB_out(                ),
+        .IOB_oe (                )
     );
 
     // sound data data bus mux
@@ -636,10 +655,10 @@ module core (
         (snd_io_rd && snd_addr[7:0] == 8'h02) ? ay_data_r  : 8'hFF;
 
     // snd mix
-    wire [13:0] ay_mix = { ay_sound, 4'd0 };
-    wire [13:0] dac_14 = { snd_dac_reg, 6'd0 };
-    wire [14:0] sound_sum = { 1'b0, ay_mix } + { 1'b0, dac_14 };
-    assign sound = sound_sum[14] ? 16'hFFFF : { 2'b00, sound_sum[13:0] };
+    //wire [12:0] ay_mix  = { ay_sound, 3'd0 };        // ×8, max 8184
+    //wire [12:0] dac_mix = { snd_dac_reg, 4'd0 };     // ×16, max 4080
+    wire [14:0] sound_sum = ay_sound + snd_dac_reg;// { 1'b0, ay_mix } + { 1'b0, dac_mix };
+    assign sound = { 1'b0, sound_sum };
 
     // sprite data bus mux
     assign spr_data_in =
