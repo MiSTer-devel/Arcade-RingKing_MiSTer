@@ -16,7 +16,7 @@
 	<rbf>ringking</rbf>
 
 	<resolution>15kHz</resolution>
-	<rotation></rotation>
+	<rotation>vertical (cw)</rotation>
 	<flip></flip>
 
 	<players>2</players>
